@@ -1,23 +1,20 @@
 #new script for performing CF actions
 
 from time import sleep
-from src.seltools import mydriver,main
-from src.cunydatatools import jsrename
+from seltools import mydriver,main
+from cunydatatools import jsrename
 from datetime import datetime,timedelta
-from src.admin import colclean,newest
+from admin import colclean,newest
 import pandas as pd
 from selenium.webdriver.common.by import By
-
+import time
+from CF_PR_datapipeline import pr_data
 
 class cunyfirst(main):
     loginurl="https://home.cunyfirst.cuny.edu/oam/Portal_Login1.html"
     unfield="CUNYfirstUsernameH"
     pwfield="CUNYfirstPassword"
     submit="submit"
-    un=input('Please type your full username/n')
-    #un=""
-    pw=input('password, plesae: ') 
-    #pw=''
     def login(self):    #consider moving this to seltools and usising data_dist
         self.driver.get(self.loginurl)
         self.waitfillid(self.unfield,self.un)
@@ -35,10 +32,16 @@ class cunyfirst(main):
         if self.driver.title == 'CUNY Login':
             self.login()
 class hcm(cunyfirst):
-    def __init__(self,driver):
-        
-        self.driver=driver
-        
+    def __init__(self,driver,un=None,pw=None):
+        self.driver=driver 
+        if un:
+            self.un=un
+        else:
+            self.un=input("Please enter your username.\n")
+        if pw:
+            self.pw=pw
+        else:
+            self.pw=input("Please enter your password.\n")
         
     cfmodule="Human Capital Management"
     
@@ -126,11 +129,6 @@ class jobpages(hcm,main):
         self.driver=driver
         self.url="https://hrsa.cunyfirst.cuny.edu/psp/cnyhcprd/EMPLOYEE/HRMS/c/ADMINISTER_WORKFORCE_(GBL).JOB_DATA.GBL"
         self.searchfield="EMPLMT_SRCH_COR_EMPLID"
-    """def nav(self):
-        self.outer_instance.nav(self.url,self.searchfield)
-    def move(self,num):
-        self.outer_instance.move(num)"""
-    
     
     field1="EMPLMT_SRCH_COR_EMPLID"
     field2="EMPLMT_SRCH_COR_EMPL_RCD"
@@ -141,8 +139,9 @@ class jobpages(hcm,main):
     links=["DERIVED_HR_JOB_DATA_BTN1","DERIVED_HR_JOB_DATA_BTN2","DERIVED_HR_JOB_DATA_BTN3","DERIVED_HR_JOB_DATA_BTN4","DERIVED_CU_JOB_DATA_BTN"]
     
     def add_row(self):
-        self.waitid(self.workloc.add_row)
-        self.wait_spin()
+        self.switch_tar()
+        self.waitid('$ICField12$new$0$$0')
+        
     def swbdict(empldict,datething,seq):
             if empldict['JOB_EFFDT$0']==datething:
                 seq=str(int(seq)+1)
@@ -157,7 +156,7 @@ class jobpages(hcm,main):
     def return_from(self,empldict):
         self.add_row()
         self.cf_data_distribute(empldict)
-        self.save_now()
+        self.cf_save[0]
     def return_switch(self):
         try:
             self.driver.switch_to.frame('TargetContent')
@@ -188,7 +187,7 @@ class jobpages(hcm,main):
         self.switch_tar()
         x=self.getvals("JOB_EFFDT$0")
         #changing the effective date to yesterday should work in most cases.
-        x=(datetime.strptime(x, '%M/%d/%Y')-timedelta(days=1)).strftime('%M/%d/%Y')
+        x=(datetime.strptime(x, "%m/%d/%Y")-timedelta(days=1)).strftime("%m/%d/%Y")
         self.data_distribute({"JOB_EFFDT$0":x})
         self.cf_save(1)
         self.cf_save(0)
@@ -196,17 +195,23 @@ class jobpages(hcm,main):
         self.switch_tar()
         x=self.dropdownitembyid("JOB_ACTION$0")
         y=self.dropdownitembyid("JOB_ACTION$0")
+        if x!="Data Change":
+            term="Data Change"
+        else:
+            term="Reappointment"
         while x==y:
-            self.data_distribute({"JOB_ACTION$0":"Data Change"})
+            self.data_distribute({"JOB_ACTION$0":term})
             y=self.dropdownitembyid("JOB_ACTION$0")
             self.cf_save(1)
+        termdict={"Data Change":"Revision","Reappointment":"Reappointment"}
+        term=termdict[term]
         #step -6 changing reason
         self.cf_save(1) #wait_spin
         self.switch_tar()
         x=self.dropdownitembyid("JOB_ACTION_REASON$0")
         y=self.dropdownitembyid("JOB_ACTION_REASON$0")
         while y==x:
-            self.data_distribute({"JOB_ACTION_REASON$0":"Revision"})
+            self.data_distribute({"JOB_ACTION_REASON$0":term})
             y=self.dropdownitembyid("JOB_ACTION_REASON$0")
             self.cf_save(1)
         #changing to Data Change/ Revision ALWAYS returns end date, thus remove
@@ -220,161 +225,6 @@ class jobpages(hcm,main):
         self.waitid("$ICField12$delete$0$$0")
         self.cf_save(1)
         self.cf_save(0)
-        
-    def deletion(self):
-        if self.windowswitch("#ICCorrection",0):    
-            self.waitid("#ICCorrection")
-        self.wait_spin()
-        if self.windowswitch("JOB_EXPECTED_END_DATE$0",0):
-            print('now removing expected end date')
-            z=self.getvals("JOB_EXPECTED_END_DATE$0")
-            if len(z)>2:
-                self.data_distribute({"JOB_EXPECTED_END_DATE$0":''})
-                self.wait_spin()
-                self.okay2()
-        if self.windowswitch("JOB_EFFDT$0",0):
-            try:
-                x=self.getvals("JOB_EFFDT$0")
-            except:
-                self.return_switch()
-                x=self.getvals("JOB_EFFDT$0")
-        else: 
-            self.return_switch()
-            try:
-                x=self.getvals("JOB_EFFDT$0")
-            except:
-                self.return_switch()
-                x=self.getvals("JOB_EFFDT$0")
-        if self.windowswitch("JOB_POSITION_NBR$0",0):
-            y=self.getvals("JOB_POSITION_NBR$0")
-        else: 
-            self.return_switch()
-            y=self.getvals("JOB_POSITION_NBR$0")
-        if len(y)>2:
-            self.data_distribute({"JOB_POSITION_NBR$0":''})
-            print('now removing position number')
-            self.okay2()
-            self.simplesave()
-            self.okay2()
-            sleep(1)
-        if int(x.split('/')[1])<27:
-            self.data_distribute({"JOB_EFFDT$0":x.split('/')[0]+'/'+str(int(x.split('/')[1])+1)+'/'+x.split('/')[2]})
-            self.wait_spin()
-            self.okay2()
-        elif int(x.split('/')[0])<12:
-            self.data_distribute({"JOB_EFFDT$0":str(int(x.split('/')[0])+1)+'/01/'+x.split('/')[2]})
-            self.wait_spin()
-            self.okay2()
-        else:
-            self.data_distribute({"JOB_EFFDT$0":'01/01/'+str(int(x.split('/')[2])+1)})
-            self.wait_spin()
-            self.okay2()
-        self.wait_spin()
-        self.okay2()
-        
-
-        self.simplesave()
-        self.wait_spin()
-        sleep(1)
-        self.okay2()
-        if self.proceed_check()==True:
-            self.okay2()
-            print('Passed proceed check')
-            job.return_switch()
-        print('now changing action/reason')
-        if self.windowswitch("JOB_ACTION$0",0):
-            x=self.dropdownitembyid("JOB_ACTION$0")
-            y=self.dropdownitembyid("JOB_ACTION$0")
-        else:
-            self.return_switch()
-            x=self.dropdownitembyid("JOB_ACTION$0")
-            y=self.dropdownitembyid("JOB_ACTION$0")
-        while y==x:
-            try:
-                self.data_distribute({"JOB_ACTION$0":"Data Change"})
-                self.wait_spin()
-                self.okay2()
-                self.wait_spin()
-                self.return_switch()
-                try:
-                    y=self.dropdownitembyid("JOB_ACTION$0")
-                except:
-                    self.return_switch()
-                    y=self.dropdownitembyid("JOB_ACTION$0")
-            except:
-                self.okay2()
-                self.return_switch()
-                self.wait_spin()
-                self.return_switch()
-                self.data_distribute({"JOB_ACTION$0":"Data Change"})
-                try:
-                    y=self.dropdownitembyid("JOB_ACTION$0")
-                except:
-                    self.return_switch()
-                    y=self.dropdownitembyid("JOB_ACTION$0")
-        if self.windowswitch("JOB_ACTION_REASON$0",0):
-            x=self.dropdownitembyid("JOB_ACTION_REASON$0")
-            y=self.dropdownitembyid("JOB_ACTION_REASON$0")
-        else:
-            self.return_switch()
-            x=self.dropdownitembyid("JOB_ACTION_REASON$0")
-            y=self.dropdownitembyid("JOB_ACTION_REASON$0")
-        while y==x:
-            try:
-                self.data_distribute({"JOB_ACTION_REASON$0":"Revision"})
-                self.wait_spin()
-                self.okay2()
-                self.wait_spin()
-                self.return_switch()
-                try:
-                    y=self.dropdownitembyid("JOB_ACTION_REASON$0")
-                except:
-                    self.return_switch()
-                    y=self.dropdownitembyid("JOB_ACTION_REASON$0")
-            except:
-                self.okay2()
-                self.return_switch()
-                self.wait_spin()
-                self.return_switch()
-                self.data_distribute({"JOB_ACTION_REASON$0":"Revision"})
-                try:
-                    y=self.dropdownitembyid("JOB_ACTION_REASON$0")
-                except:
-                    self.return_switch()
-                    y=self.dropdownitembyid("JOB_ACTION_REASON$0")
-        if self.windowswitch("JOB_EXPECTED_END_DATE$0",0):
-            z=self.getvals("JOB_EXPECTED_END_DATE$0")
-            if len(z)>2:
-                self.data_distribute({"JOB_EXPECTED_END_DATE$0":''})
-                self.okay2()
-        else:
-            self.return_switch()
-            z=self.getvals("JOB_EXPECTED_END_DATE$0")
-            if len(z)>2:
-                self.data_distribute({"JOB_EXPECTED_END_DATE$0":''})
-                self.okay2()
-            
-        self.simplesave()
-        self.okay2()
-        sleep(1)
-        self.return_switch()
-        if self.proceed_check()==True:
-            self.okay2()
-            print('Passed proceed check')
-            job.return_switch()
-        print('now attempting to delete this record')
-        if self.windowswitch("$ICField12$delete$0$$0",0):
-            self.waitid("$ICField12$delete$0$$0")
-        else:
-            self.return_switch()
-            self.waitid("$ICField12$delete$0$$0")
-        self.wait_spin()
-        self.okay2()
-        self.wait_spin()
-        self.simplesave()
-        self.okay2()
-        sleep(1)
-
 
     def open_this(self,empldict):
         self.data_distribute(empldict)
@@ -403,20 +253,15 @@ class jobpages(hcm,main):
                     self.deletion()
                 job.nav()
     def revision(self,empldict):
-        self.data_distribute(empldict)
-        self.waitid(self.search)
-        self.wait_spin()
-        try:
-            self.waitid("SEARCH_RESULT1")
-            self.wait_spin()
-        except:
-            pass
+        empldict1=[v for k,v in empldict.items() if k in ["EMPLMT_SRCH_COR_EMPLID","EMPLMT_SRCH_COR_EMPL_RCD"]]
+        empldict1=[str(max([int(x) for x in empldict1])),str(min([int(x) for x in empldict1]))]
+        self.openrecord('job',empldict1)
         if self.getvals("JOB_EFFDT$0")==empldict["JOB_EFFDT$0"] and self.gettext("JOB_ACTION_DT$0")==datetime.now().strftime('%m/%d/%Y'):
             #unfortunately, this will prevent us from loading anything same dated
-            #PLEASE NOTE, NEED FIX, WILL REQUIRE SEQUENCE VALIDATION
+            #TODO fix this part of the function. Does require sequence validation.
             self.nav()
             return()
-        elif int(self.getvals("JOB_EFFDT$0")[:2])>int(empldict["JOB_EFFDT$0"][:2]):
+        elif datetime.strptime(self.getvals("JOB_EFFDT$0"),'%m/%d/%Y')>datetime.strptime(empldict["JOB_EFFDT$0"],'%m/%d/%Y'):
             self.nav()
             return()
         if self.gettext('JOB_EMPL_STATUS$0') == "Short Work Break":
@@ -426,15 +271,23 @@ class jobpages(hcm,main):
             self.return_from(empldict2)
         self.add_row()
         self.data_distribute(empldict)
+        print('done distributing')
+        self.cf_save(1)
         try:
-            self.move(4)
+            print("trying to move")
+            self.cf_save(1)
+            self.switch_tar()
+            job.waitid("DERIVED_CU_JOB_DATA_BTN")
         except:
-            self.okay()
+            print("that failed. Trying to move again")
+            self.cf_save(1)
             sleep(1)
-            self.move(4)
+            job.waitid("DERIVED_CU_JOB_DATA_BTN")
             sleep(1)
+        print("I'm distributing again")
         self.data_distribute(empldict)
-        self.save_now()
+        print('finally saving')
+        self.cf_save(0)
         sleep(1)
         self.nav()
         
@@ -690,14 +543,20 @@ class reports(object):
         url="https://hrsa.cunyfirst.cuny.edu/psp/cnyhcprd/EMPLOYEE/HRMS/c/CU_HCM.CU_R1013.GBL"
             
 def createdict(process_item):
-    empldict={}    
-    empldict["EMPLMT_SRCH_COR_EMPLID"]=process_item[2]
-    empldict["EMPLMT_SRCH_COR_EMPL_RCD"]=process_item[5]
-    empldict["JOB_EFFDT$0"]=process_item[0]
-    empldict['JOB_ACTION$0']='Data Change'
-    empldict["JOB_ACTION_REASON$0"]="Revision"
-    empldict["JOB_EXPECTED_END_DATE$0"]=process_item[6]
-    empldict["CU_JOB_JR_CU_APPOINT_HRS$0"]=process_item[7]
+    if type(process_item)=='list':
+        empldict={}    
+        empldict["EMPLMT_SRCH_COR_EMPLID"]=process_item[2]
+        empldict["EMPLMT_SRCH_COR_EMPL_RCD"]=process_item[5]
+        empldict["JOB_EFFDT$0"]=process_item[0]
+        empldict['JOB_ACTION$0']='Data Change'
+        empldict["JOB_ACTION_REASON$0"]="Revision"
+        empldict["JOB_EXPECTED_END_DATE$0"]=process_item[6]
+        empldict["CU_JOB_JR_CU_APPOINT_HRS$0"]=process_item[7]
+    else:
+        objlist=["EMPLMT_SRCH_COR_EMPLID","EMPLMT_SRCH_COR_EMPL_RCD","JOB_EFFDT$0",
+                 'JOB_ACTION$0',"JOB_ACTION_REASON$0","JOB_EXPECTED_END_DATE$0",
+                 "CU_JOB_JR_CU_APPOINT_HRS$0"]
+        empldict={obj:process_item[obj] for obj in objlist}
     return(empldict)   
 def parse_hr_trans(df):
     df=df[(df.Action=="Termination")&(df['Action Reason']=='Mass System Termination')]    
@@ -735,45 +594,6 @@ def find_all_iframes(driver):
         driver.switch_to.parent_frame()
 
 #TODO function that closes open popup using driver.window_handles and counting
-"""
-job.driver.switch_to.default_content()
-frames=job.driver.find_elements(By.TAG_NAME, 'iframe')
-print([i.id for i in frames])
-xyz=job.driver.page_source
-job.driver.switch_to.frame(frames[0])
-frame2s=job.driver.find_elements(By.TAG_NAME, 'iframe')
-job.driver.switch_to.frame("TargetContent")
-#this is me trying to figure out, in a scientific fashion, how cunyfirst works
-#it looks like there are only 3 places where things happen
-#default_content, TargetContent iframe, and frame[0]
-#ALERTOK was found in default_content. Twice. That's twice it's shown up there
-#this suggests a different way of checking for the rpesence of a popup and resolve
-#This only happens when the window itself is there. 
-#buttons, like Save, are always in TargetContent
-#WAIT_win is in TargetContent
-import time
-def timer(func,data1,data2=None):
-    #runtime
-    start_time = time.time()
-    if data2:
-        func(data1,data2)
-    else:
-        func(data1)
-    print("Runs in : %s seconds using given test case" % (time.time() - start_time))
-def switch1(driver):
-    driver.switch_to.frame("TargetContent")
-def switch2(driver):
-    elem=driver.find_element(By.ID,"ptifrmtgtframe")
-    driver.switch_to.frame(elem)
-driver.switch_to.default_content()    
-timer(switch1,job.driver)
-driver.switch_to.default_content()
-timer(switch2,job.driver)
-
-#timing different methods of frame switching
-
-
-"""
 if __name__ == "__main__":
     download_dir="C:\\Users\\shane\\downloads"
     driver=mydriver.setupbrowser(mydriver(download_dir))
@@ -781,3 +601,27 @@ if __name__ == "__main__":
     home.loginnow()
     job=jobpages(home.driver)
     job.nav()
+    filefolder=""
+    listoftups=pr_data(filefolder,flag=True)
+    listofdicts=pr_data(filefolder)
+    
+    """for ix,i in enumerate(listoftups):
+        try:
+            job.nav()
+            job.openrecord("job",i)
+            job.deletion_new()
+            print(f'record {ix} complete.')
+        except:
+            print(f'problem with record {ix}')
+            job.nav()
+    """
+    for ix,i in enumerate(listofdicts):
+        
+        try:
+            job.revision(i)
+            print(f'completing item {ix}.')    
+        except:
+            print(f'error with item {ix}')
+            job.nav()
+        print("Currently at : %s seconds using given test case" % (time.time() - start_time))
+
