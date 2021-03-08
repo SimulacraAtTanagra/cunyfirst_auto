@@ -235,17 +235,17 @@ class jobpages(hcm,main):
             self.wait_spin()
         except:
             pass
-    def massdeletion(self,thislist=None,df=None):
-        if df:
-            for i in df.code.values:
+    def massdeletion(self,obj):
+        if type(obj)!=list:
+            for i in obj.code.values:
                 sleep(1)
                 self.open_record('job',[i[:-1],i[-1:]])
                 self.wait_spin()
                 if self.gettext("JOB_EMPL_STATUS$0")=="Terminated":
                     self.deletion()
                 self.nav() 
-        if thislist:
-            for i in thislist:
+        else:
+            for i in obj:
                 sleep(1)
                 self.openrecord('job',[x for x in i])
                 self.wait_spin()
@@ -253,6 +253,8 @@ class jobpages(hcm,main):
                     self.deletion()
                 job.nav()
     def revision(self,empldict):
+        #TODO speed datadistribute by using page-specific data
+        #TODO make visiting all pages mandatory if ther eis data from them
         empldict1=[v for k,v in empldict.items() if k in ["EMPLMT_SRCH_COR_EMPLID","EMPLMT_SRCH_COR_EMPL_RCD"]]
         empldict1=[str(max([int(x) for x in empldict1])),str(min([int(x) for x in empldict1]))]
         self.openrecord('job',empldict1)
@@ -271,22 +273,17 @@ class jobpages(hcm,main):
             self.return_from(empldict2)
         self.add_row()
         self.data_distribute(empldict)
-        print('done distributing')
         self.cf_save(1)
         try:
-            print("trying to move")
             self.cf_save(1)
             self.switch_tar()
             job.waitid("DERIVED_CU_JOB_DATA_BTN")
         except:
-            print("that failed. Trying to move again")
             self.cf_save(1)
             sleep(1)
             job.waitid("DERIVED_CU_JOB_DATA_BTN")
             sleep(1)
-        print("I'm distributing again")
         self.data_distribute(empldict)
-        print('finally saving')
         self.cf_save(0)
         sleep(1)
         self.nav()
