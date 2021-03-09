@@ -272,7 +272,7 @@ class jobpages(hcm,main):
             empldict,empldict2=self.swbdict(empldict,ding,dong)
             self.return_from(empldict2)
         self.add_row()
-        source=self.driver.page_source
+        #source=self.driver.page_source
         self.data_distribute(empldict)
         self.cf_save(1)
         try:
@@ -614,7 +614,7 @@ if __name__ == "__main__":
             job.nav()
     """
     for ix,i in enumerate(listofdicts):
-        
+        start_time = time.time()
         try:
             job.revision(i)
             print(f'completing item {ix}.')    
