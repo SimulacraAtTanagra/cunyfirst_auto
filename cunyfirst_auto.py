@@ -272,6 +272,7 @@ class jobpages(hcm,main):
             empldict,empldict2=self.swbdict(empldict,ding,dong)
             self.return_from(empldict2)
         self.add_row()
+        source=self.driver.page_source
         self.data_distribute(empldict)
         self.cf_save(1)
         try:
