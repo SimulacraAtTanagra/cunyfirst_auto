@@ -138,9 +138,33 @@ class cjr(hcm,main):
     def __init__(self,driver):
         self.driver=driver
         self.url='https://hrsa.cunyfirst.cuny.edu/psp/cnyhcprd_1/EMPLOYEE/HRMS/c/CU_HCM.CU_R1013.GBL'
-    def run_current(self):
+    def run_current(self,datadict=None):
         #TODO add instructions for running a CJR to a specified folder(?)
-        print("now running")
+        self.cf_okay(1)
+        self.switch_tar()   #what we want is in the Target Content frame
+        self.waitid("#ICSearch")    #if you've only saved one of this search..
+        self.cf_okay(1) #waiting because it will take you to search params
+        #filling out search params
+        #for best results, we are doing as of today, always, Full Report
+        #all fields other than Business Unit blank
+        #if you've run this before, it shuld still have the prior details
+        if datadict:
+            datadict=datadict
+        else:
+            datadict={'CU_R1013_RUNCNT_ASOFDATE': datetime.now().strftime('%m/%d/%Y'),
+             'CU_R1013_COMPAN_COMPANY$0': '',
+             'CU_R1013_DEPT_DEPTID$0': '',
+             'CU_R1013_BU_BUSINESS_UNIT$0': 'YRK01',
+             'CU_R1013_EMPCLA_EMPL_CLASS$0': '',
+             'CU_R1013_JOBCD_JOBCODE$0': '',
+             'CU_R1013_EEO_EEO_JOB_GROUP$0': '',
+             'CU_R1013_JOBFCT_JOB_FUNCTION$0': '',
+             'CU_R1013_RUNCNT_FULL_PART_TIME': '',
+             'CU_R1013_RUNCNT_HR_STATUS': '',
+             'CU_R1013_PAYSTS_EMPL_STATUS$0': ''
+                    }
+        self.data_distribute(datadict)
+        
 
 
 class jobpages(hcm,main):
@@ -270,7 +294,7 @@ class jobpages(hcm,main):
                 self.wait_spin()
                 if self.gettext("JOB_EMPL_STATUS$0")=='Terminated':
                     self.deletion()
-                job.nav()
+                self.nav()
     def revision(self,empldict):
         #TODO speed datadistribute by using page-specific data
         #TODO make visiting all pages mandatory if ther eis data from them
@@ -582,6 +606,9 @@ def parse_hr_trans(df):
     return(df[['code']])
 
 def parsehtml(x):
+    #use this on pagesource to turn html into a list of strings
+    #makes it easy to scan portions of long html for particular substrings
+    #also allows looking at surrounding code of that instance using index position
     x=x.replace(">","999999")
     x=x.replace("<","999999")
     x=x.replace(">","999999")
