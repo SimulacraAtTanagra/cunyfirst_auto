@@ -61,7 +61,7 @@ class hcm(cunyfirst):
                     if hasattr(self,'searchfield'):
                         self.switch_tar()
                         self.waitid(self.searchfield)
-                    break
+                    return(True)
     
     def swtich(self):
         self.waitid(self.navid)
@@ -124,6 +124,16 @@ class hcm(cunyfirst):
                 print([i[0] for i in [(name,value) for  name, value in locals().items()] if i[1]!=False])
                 self.wait_spin()
                 self.okay2()
+                
+    def close_pop(self):
+        if len(self.driver.window_handles)>2:
+            self.driver.switch_to.window(driver.window_handles[-1])
+            self.cf_okay()
+            self.driver.switch_to.window(driver.window_handles[-1])
+            self.switch_tar()
+            if "Log in with" in self.driver.page_source:
+                self.login()
+    
 class cjr(hcm,main):
     def __init__(self,driver):
         self.driver=driver
@@ -287,11 +297,11 @@ class jobpages(hcm,main):
         try:
             self.cf_save(1)
             self.switch_tar()
-            job.waitid("DERIVED_CU_JOB_DATA_BTN")
+            self.waitid("DERIVED_CU_JOB_DATA_BTN")
         except:
             self.cf_save(1)
             sleep(1)
-            job.waitid("DERIVED_CU_JOB_DATA_BTN")
+            self.waitid("DERIVED_CU_JOB_DATA_BTN")
             sleep(1)
         self.data_distribute(empldict)
         self.cf_save(0)
@@ -565,10 +575,12 @@ def createdict(process_item):
                  "CU_JOB_JR_CU_APPOINT_HRS$0"]
         empldict={obj:process_item[obj] for obj in objlist}
     return(empldict)   
+
 def parse_hr_trans(df):
     df=df[(df.Action=="Termination")&(df['Action Reason']=='Mass System Termination')]    
     df['code']= df['Employee ID'].astype('str')+df['Empl RCD'].astype('str')
     return(df[['code']])
+
 def parsehtml(x):
     x=x.replace(">","999999")
     x=x.replace("<","999999")
@@ -576,22 +588,25 @@ def parsehtml(x):
     x=x.split("999999")
     return(x)
     
-def frame_search(path):
+def frame_search(driver,path):
     framedict = {}
-    for child_frame in job.driver.find_elements_by_tag_name('frame'):
+    for child_frame in driver.find_elements_by_tag_name('frame'):
         child_frame_name = child_frame.get_attribute('name')
         framedict[child_frame_name] = {'framepath' : path, 'children' : {}}
         xpath = '//frame[@name="{}"]'.format(child_frame_name)
-        job.driver.switch_to.frame(job.driver.find_element_by_xpath(xpath))
+        driver.switch_to.frame(driver.find_element_by_xpath(xpath))
         framedict[child_frame_name]['children'] = frame_search(framedict[child_frame_name]['framepath']+[child_frame_name])
         #do something involving this child_frame
-        job.driver.switch_to.default_content()
+        driver.switch_to.default_content()
         if len(framedict[child_frame_name]['framepath'])>0:
             for parent in framedict[child_frame_name]['framepath']:
                 parent_xpath = '//frame[@name="{}"]'.format(parent)
-                job.driver.switch_to.frame(job.driver.find_element_by_xpath(parent_xpath))
+                driver.switch_to.frame(driver.find_element_by_xpath(parent_xpath))
     return framedict
+
 def find_all_iframes(driver):
+    #TODO Improve this code. Still fails in CJR module in CF
+    driver.switch_to.default_content()
     iframes = driver.find_elements(By.TAG_NAME, 'iframe')
     print(len(iframes))
     for index, iframe in enumerate(iframes):
@@ -604,13 +619,14 @@ def find_all_iframes(driver):
 if __name__ == "__main__":
     download_dir="C:\\Users\\shane\\downloads"
     driver=mydriver.setupbrowser(mydriver(download_dir))
-    home=hcm(driver)
+    home=hcm(driver,un=USERNAME,pw=PASSWORD)
     home.loginnow()
     #job=jobpages(home.driver)
     #job.nav()
     cjr=cjr(home.driver)
     cjr.nav()
-    """
+    """while True:
+        cjr.close_pop()
     filefolder=""
     listoftups=pr_data(filefolder,flag=True)
     listofdicts=pr_data(filefolder)
@@ -634,5 +650,4 @@ if __name__ == "__main__":
             print(f'error with item {ix}')
             job.nav()
         print("Currently at : %s seconds using given test case" % (time.time() - start_time))
-
     """
