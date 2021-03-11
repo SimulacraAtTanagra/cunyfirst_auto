@@ -58,8 +58,9 @@ class hcm(cunyfirst):
                     pass
                 else:
                     sleep(1)
-                    self.windowswitch(self.searchfield,0)
-                    self.waitid(self.searchfield)
+                    if hasattr(self,'searchfield'):
+                        self.switch_tar()
+                        self.waitid(self.searchfield)
                     break
     
     def swtich(self):
@@ -123,7 +124,15 @@ class hcm(cunyfirst):
                 print([i[0] for i in [(name,value) for  name, value in locals().items()] if i[1]!=False])
                 self.wait_spin()
                 self.okay2()
-        
+class cjr(hcm,main):
+    def __init__(self,driver):
+        self.driver=driver
+        self.url='https://hrsa.cunyfirst.cuny.edu/psp/cnyhcprd_1/EMPLOYEE/HRMS/c/CU_HCM.CU_R1013.GBL'
+    def run_current(self):
+        #TODO add instructions for running a CJR to a specified folder(?)
+        print("now running")
+
+
 class jobpages(hcm,main):
     def __init__(self, driver):
         self.driver=driver
@@ -597,13 +606,16 @@ if __name__ == "__main__":
     driver=mydriver.setupbrowser(mydriver(download_dir))
     home=hcm(driver)
     home.loginnow()
-    job=jobpages(home.driver)
-    job.nav()
+    #job=jobpages(home.driver)
+    #job.nav()
+    cjr=cjr(home.driver)
+    cjr.nav()
+    """
     filefolder=""
     listoftups=pr_data(filefolder,flag=True)
     listofdicts=pr_data(filefolder)
     
-    """for ix,i in enumerate(listoftups):
+    for ix,i in enumerate(listoftups):
         try:
             job.nav()
             job.openrecord("job",i)
@@ -612,7 +624,7 @@ if __name__ == "__main__":
         except:
             print(f'problem with record {ix}')
             job.nav()
-    """
+    
     for ix,i in enumerate(listofdicts):
         start_time = time.time()
         try:
@@ -623,3 +635,4 @@ if __name__ == "__main__":
             job.nav()
         print("Currently at : %s seconds using given test case" % (time.time() - start_time))
 
+    """
