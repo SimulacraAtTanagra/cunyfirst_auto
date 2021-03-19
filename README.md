@@ -7,4 +7,4 @@ pandas, fuzzywuzzy, selenium, webdriver_manager, xlrd
 ## In order to use this, you'll first need do the following:
 If you are preparing to use this script, do not. Most of the functions have not yet been revised to be fully functional and may result in data damage or errors. As of this writing, the most up to date (and fully functional) portion of this is the deletion_new method for the jobpages class. Please, please, please do not attempt to use any of this so long as this readme includes this paragraph.
 ## The expected frequency for running this code is as follows:
-As needed
+As Needed
