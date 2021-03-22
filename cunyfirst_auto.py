@@ -1,4 +1,4 @@
-from seltools import main
+from src.seltools import main
 from selenium.webdriver.common.by import By
 
 
